@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:;">
-<!-- v12b-flags-clean -->
+<!-- v12-flag-images -->
 <title>FIFA World Cup 2026 - Bracket Challenge</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
 <!-- Firebase via REST API - no external SDK scripts needed -->
@@ -631,23 +631,93 @@ function toggleThird(group) {
 }
 
 // ===================== KNOCKOUT =====================
+// Official FIFA 2026 Round-of-32 slot order (matches 73-88).
+// Each entry defines the two teams in that R32 match, in bracket order.
+// Codes: '1X'=winner of group X, '2X'=runner-up of group X, '3'=a third-place team (assigned below).
+// This guarantees no two same-group teams ever meet in R32 (FIFA designed it this way).
+var R32_SLOTS = [
+  ['2A','2B'],   // M73
+  ['1E','3:E'],  // M74  (winner E vs a 3rd-place team)
+  ['1F','2C'],   // M75
+  ['1C','2F'],   // M76
+  ['1I','3:I'],  // M77
+  ['2E','2I'],   // M78
+  ['1A','3:A'],  // M79
+  ['1L','3:L'],  // M80
+  ['1D','3:D'],  // M81
+  ['1G','3:G'],  // M82
+  ['2K','2L'],   // M83
+  ['1H','2J'],   // M84
+  ['1B','3:B'],  // M85
+  ['1J','2H'],   // M86
+  ['1K','3:K'],  // M87
+  ['2D','2G']    // M88
+];
+
+// Which source groups each third-place slot may draw from (official regs).
+var THIRD_SLOTS = [
+  {winner:'E', allowed:['A','B','C','D','F']},
+  {winner:'I', allowed:['C','D','F','G','H']},
+  {winner:'A', allowed:['C','E','F','H','I']},
+  {winner:'L', allowed:['E','H','I','J','K']},
+  {winner:'D', allowed:['B','E','F','I','J']},
+  {winner:'G', allowed:['A','E','H','I','J']},
+  {winner:'B', allowed:['E','F','G','I','J']},
+  {winner:'K', allowed:['D','E','I','J','L']}
+];
+
+// Assign the 8 qualifying third-place groups to the 8 winner-slots via FIFA's constraint matching.
+function assignThirds(qualGroups) {
+  var used = {}, result = {};
+  function bt(i) {
+    if (i === THIRD_SLOTS.length) return true;
+    var slot = THIRD_SLOTS[i];
+    for (var j=0;j<slot.allowed.length;j++) {
+      var g = slot.allowed[j];
+      if (qualGroups.indexOf(g) >= 0 && !used[g]) {
+        used[g] = true; result[slot.winner] = g;
+        if (bt(i+1)) return true;
+        used[g] = false;
+      }
+    }
+    return false;
+  }
+  return bt(0) ? result : null;
+}
+
+// Returns the 32 qualified teams IN OFFICIAL R32 BRACKET ORDER (pairs of opponents adjacent).
 function getQualifiedTeams() {
   if (!myPred) return [];
-  const q = [];
-  GROUP_KEYS.forEach(g => {
-    const o = myPred.groups[g];
-    q.push({name:o[0],group:g,pos:1,flag:getFlag(g,o[0])});
-    q.push({name:o[1],group:g,pos:2,flag:getFlag(g,o[1])});
-  });
-  const picks = myPred.thirdPlace||[];
-  if (picks.length===8) {
-    picks.forEach(name => {
-      const g = GROUP_KEYS.find(g=>myPred.groups[g][2]===name);
-      if (g) q.push({name,group:g,pos:3,flag:getFlag(g,name)});
-    });
+  // Which 8 groups produced qualifying 3rd-place teams?
+  var picks = myPred.thirdPlace || [];
+  var thirdGroups;
+  if (picks.length === 8) {
+    thirdGroups = picks.map(function(name){
+      return GROUP_KEYS.find(function(g){ return myPred.groups[g][2] === name; });
+    }).filter(Boolean);
   } else {
-    GROUP_KEYS.slice(0,8).forEach(g=>{const o=myPred.groups[g];q.push({name:o[2],group:g,pos:3,flag:getFlag(g,o[2])});});
+    // fallback: first 8 groups
+    thirdGroups = GROUP_KEYS.slice(0,8);
   }
+  var thirdAssign = assignThirds(thirdGroups) || {};
+
+  function teamFor(code) {
+    if (code.charAt(0) === '1') { var g=code.charAt(1); return {name:myPred.groups[g][0], group:g, pos:1, flag:getFlag(g,myPred.groups[g][0])}; }
+    if (code.charAt(0) === '2') { var g2=code.charAt(1); return {name:myPred.groups[g2][1], group:g2, pos:2, flag:getFlag(g2,myPred.groups[g2][1])}; }
+    if (code.indexOf('3:') === 0) {
+      var winnerGrp = code.split(':')[1];
+      var srcGrp = thirdAssign[winnerGrp];
+      if (srcGrp) { var n=myPred.groups[srcGrp][2]; return {name:n, group:srcGrp, pos:3, flag:getFlag(srcGrp,n)}; }
+      return {name:'?', group:'', pos:3, flag:getFlag('','')};
+    }
+    return {name:'?', group:'', pos:0, flag:getFlag('','')};
+  }
+
+  var q = [];
+  R32_SLOTS.forEach(function(match){
+    q.push(teamFor(match[0]));
+    q.push(teamFor(match[1]));
+  });
   return q;
 }
 
@@ -665,7 +735,8 @@ function renderKnockout() {
   const container = document.getElementById('knockout-bracket');
   if (!myPred) { container.innerHTML='<p style="color:var(--muted);font-family:\'Barlow Condensed\',sans-serif;">Join first and fill in your group predictions.</p>'; return; }
   const qualified = getQualifiedTeams();
-  if (myPred.ko.r32.length!==32) myPred.ko.r32 = qualified.map(t=>t.name);
+  // R32 seeding is always derived from current group + third-place predictions (official order).
+  myPred.ko.r32 = qualified.map(t=>t.name);
   let html = '<div class="knockout-grid">';
   html += buildKoRound('r32','Round of 32',qualified);
   html += buildKoRound('r16','Round of 16',qualified);
