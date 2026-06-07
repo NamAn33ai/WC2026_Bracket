@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:;">
-<!-- v11-bracket-fix -->
+<!-- v12-flag-images -->
 <title>FIFA World Cup 2026 - Bracket Challenge</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
 <!-- Firebase via REST API - no external SDK scripts needed -->
@@ -400,18 +400,18 @@ document.dispatchEvent(new Event('fbReady'));
 <script>
 // ===================== CONSTANTS =====================
 const GROUPS = {
-  A:{teams:[{name:"Mexico",flag:"🇲🇽"},{name:"South Korea",flag:"🇰🇷"},{name:"South Africa",flag:"🇿🇦"},{name:"Czechia",flag:"🇨🇿"}]},
-  B:{teams:[{name:"Canada",flag:"🇨🇦"},{name:"Switzerland",flag:"🇨🇭"},{name:"Bosnia-Herz.",flag:"🇧🇦"},{name:"Qatar",flag:"🇶🇦"}]},
-  C:{teams:[{name:"Brazil",flag:"🇧🇷"},{name:"Morocco",flag:"🇲🇦"},{name:"Scotland",flag:"🏴󠁧󠁢󠁳󠁣󠁴󠁿"},{name:"Haiti",flag:"🇭🇹"}]},
-  D:{teams:[{name:"United States",flag:"🇺🇸"},{name:"Australia",flag:"🇦🇺"},{name:"Paraguay",flag:"🇵🇾"},{name:"Turkiye",flag:"🇹🇷"}]},
-  E:{teams:[{name:"Germany",flag:"🇩🇪"},{name:"Ivory Coast",flag:"🇨🇮"},{name:"Ecuador",flag:"🇪🇨"},{name:"Curacao",flag:"🇨🇼"}]},
-  F:{teams:[{name:"Netherlands",flag:"🇳🇱"},{name:"Japan",flag:"🇯🇵"},{name:"Sweden",flag:"🇸🇪"},{name:"Tunisia",flag:"🇹🇳"}]},
-  G:{teams:[{name:"Belgium",flag:"🇧🇪"},{name:"Egypt",flag:"🇪🇬"},{name:"Iran",flag:"🇮🇷"},{name:"New Zealand",flag:"🇳🇿"}]},
-  H:{teams:[{name:"Spain",flag:"🇪🇸"},{name:"Uruguay",flag:"🇺🇾"},{name:"Saudi Arabia",flag:"🇸🇦"},{name:"Cape Verde",flag:"🇨🇻"}]},
-  I:{teams:[{name:"France",flag:"🇫🇷"},{name:"Senegal",flag:"🇸🇳"},{name:"Norway",flag:"🇳🇴"},{name:"Iraq",flag:"🇮🇶"}]},
-  J:{teams:[{name:"Argentina",flag:"🇦🇷"},{name:"Algeria",flag:"🇩🇿"},{name:"Austria",flag:"🇦🇹"},{name:"Jordan",flag:"🇯🇴"}]},
-  K:{teams:[{name:"Portugal",flag:"🇵🇹"},{name:"Colombia",flag:"🇨🇴"},{name:"DR Congo",flag:"🇨🇩"},{name:"Uzbekistan",flag:"🇺🇿"}]},
-  L:{teams:[{name:"England",flag:"🏴󠁧󠁢󠁥󠁮󠁧󠁿"},{name:"Croatia",flag:"🇭🇷"},{name:"Ghana",flag:"🇬🇭"},{name:"Panama",flag:"🇵🇦"}]}
+  A:{teams:[{name:"Mexico",flag:"mx"},{name:"South Korea",flag:"kr"},{name:"South Africa",flag:"za"},{name:"Czechia",flag:"cz"}]},
+  B:{teams:[{name:"Canada",flag:"ca"},{name:"Switzerland",flag:"ch"},{name:"Bosnia-Herz.",flag:"ba"},{name:"Qatar",flag:"qa"}]},
+  C:{teams:[{name:"Brazil",flag:"br"},{name:"Morocco",flag:"ma"},{name:"Scotland",flag:"gb-sct"},{name:"Haiti",flag:"ht"}]},
+  D:{teams:[{name:"United States",flag:"us"},{name:"Australia",flag:"au"},{name:"Paraguay",flag:"py"},{name:"Turkiye",flag:"tr"}]},
+  E:{teams:[{name:"Germany",flag:"de"},{name:"Ivory Coast",flag:"ci"},{name:"Ecuador",flag:"ec"},{name:"Curacao",flag:"cw"}]},
+  F:{teams:[{name:"Netherlands",flag:"nl"},{name:"Japan",flag:"jp"},{name:"Sweden",flag:"se"},{name:"Tunisia",flag:"tn"}]},
+  G:{teams:[{name:"Belgium",flag:"be"},{name:"Egypt",flag:"eg"},{name:"Iran",flag:"ir"},{name:"New Zealand",flag:"nz"}]},
+  H:{teams:[{name:"Spain",flag:"es"},{name:"Uruguay",flag:"uy"},{name:"Saudi Arabia",flag:"sa"},{name:"Cape Verde",flag:"cv"}]},
+  I:{teams:[{name:"France",flag:"fr"},{name:"Senegal",flag:"sn"},{name:"Norway",flag:"no"},{name:"Iraq",flag:"iq"}]},
+  J:{teams:[{name:"Argentina",flag:"ar"},{name:"Algeria",flag:"dz"},{name:"Austria",flag:"at"},{name:"Jordan",flag:"jo"}]},
+  K:{teams:[{name:"Portugal",flag:"pt"},{name:"Colombia",flag:"co"},{name:"DR Congo",flag:"cd"},{name:"Uzbekistan",flag:"uz"}]},
+  L:{teams:[{name:"England",flag:"gb-eng"},{name:"Croatia",flag:"hr"},{name:"Ghana",flag:"gh"},{name:"Panama",flag:"pa"}]}
 };
 const GROUP_KEYS = Object.keys(GROUPS);
 const KO_POINTS = {r32:2,r16:3,qf:4,sf:5,final:6,champion:7};
@@ -555,11 +555,11 @@ function renderGroups() {
     return `<div class="group-card">
       <div class="group-header"><div class="group-label">${g}</div><div class="group-header-title">Group ${g}</div></div>
       <div class="team-rows">${order.map((teamName,pos) => {
-        const team = GROUPS[g].teams.find(t=>t.name===teamName)||{name:teamName,flag:'🌍'};
+        const team = GROUPS[g].teams.find(t=>t.name===teamName)||{name:teamName,flag:''};
         const badge = pos<2 ? '<span class="pos-badge q">Qualify</span>' : pos===2 ? '<span class="pos-badge maybe">Maybe</span>' : '<span class="pos-badge out">Out</span>';
         return `<div class="team-row">
           <div class="rank-num pos-${pos+1}">${pos+1}</div>
-          <div class="flag">${team.flag}</div>
+          <div class="flag">${flagImg(team.flag)}</div>
           <div class="team-name">${team.name}</div>
           ${badge}
           <div class="move-btns">
@@ -601,7 +601,7 @@ function renderThirdPlace() {
     const flag = getFlag(g,teamName);
     const isSel = sel.includes(teamName);
     return `<div class="third-card ${isSel?'selected':''}" onclick="toggleThird('${g}')">
-      <span style="font-size:1.15rem">${flag}</span>
+      <span>${flag}</span>
       <span style="flex:1">${teamName}</span>
       <span class="third-group-badge">GRP ${g}</span>
       <span class="third-check">&#10003;</span>
@@ -721,9 +721,14 @@ function getQualifiedTeams() {
   return q;
 }
 
+function flagImg(code) {
+  if (!code) return '<span style="display:inline-block;width:21px;height:15px;background:#2A2B38;border-radius:2px;vertical-align:middle;"></span>';
+  return '<img src="https://flagcdn.com/h20/'+code+'.png" width="21" height="15" loading="lazy" alt="" style="border-radius:2px;vertical-align:middle;object-fit:cover;">';
+}
+
 function getFlag(group,teamName) {
   const t = GROUPS[group]?.teams.find(t=>t.name===teamName);
-  return t?t.flag:'🌍';
+  return flagImg(t?t.flag:'');
 }
 
 function renderKnockout() {
@@ -739,7 +744,7 @@ function renderKnockout() {
   html += buildKoRound('sf','Semi-Finals',qualified);
   html += buildKoRound('final','Final',qualified);
   const champ = myPred.ko.champion||'';
-  const cf = champ?(qualified.find(t=>t.name===champ)?.flag||'🌍'):'?';
+  const cf = champ?(qualified.find(t=>t.name===champ)?.flag||flagImg('')):'';
   html += `<div class="champion-box"><div class="champion-trophy">🏆</div><div class="champion-label">World Champion</div><div class="champion-name">${champ?cf+' '+champ:'TBD'}</div></div>`;
   html += '</div>';
   container.innerHTML = html;
@@ -754,8 +759,8 @@ function buildKoRound(roundId,label,qualified) {
     const nr = getNextRound(roundId);
     const nextTeams = nr==='champion' ? [myPred.ko.champion] : (myPred.ko[nr]||[]);
     const winner = nextTeams.includes(t1)?t1:nextTeams.includes(t2)?t2:'';
-    const f1=qualified.find(t=>t.name===t1)?.flag||'🌍';
-    const f2=qualified.find(t=>t.name===t2)?.flag||'🌍';
+    const f1=qualified.find(t=>t.name===t1)?.flag||flagImg('');
+    const f2=qualified.find(t=>t.name===t2)?.flag||flagImg('');
     html += `<div class="ko-match">
       <div class="ko-team ${winner===t1?'winner':winner&&winner!==t1?'loser':''}" onclick="pickKoWinner('${roundId}',${i},'${t1.replace(/'/g,"\\'")}')">
         <span class="flag">${f1}</span><span class="ko-team-name">${t1}</span>${winner===t1?'<span class="ko-check">&#10003;</span>':''}
@@ -852,11 +857,11 @@ function renderResultsGroups() {
     return `<div class="group-card">
       <div class="group-header"><div class="group-label">${g}</div><div class="group-header-title">Official - Group ${g}</div></div>
       <div class="team-rows">${ro.map((teamName,pos)=>{
-        const team=GROUPS[g].teams.find(t=>t.name===teamName)||{name:teamName,flag:'🌍'};
+        const team=GROUPS[g].teams.find(t=>t.name===teamName)||{name:teamName,flag:''};
         const badge=pos<2?'<span class="pos-badge q">Qualify</span>':pos===2?'<span class="pos-badge maybe">Maybe</span>':'<span class="pos-badge out">Out</span>';
         return `<div class="team-row">
           <div class="rank-num pos-${pos+1}">${pos+1}</div>
-          <div class="flag">${team.flag}</div>
+          <div class="flag">${flagImg(team.flag)}</div>
           <div class="team-name">${team.name}</div>
           ${badge}
           <div class="move-btns">
