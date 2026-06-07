@@ -493,7 +493,7 @@ function scheduleSave() {
         ko: myPred.ko,
         thirdPlace: myPred.thirdPlace || []
       });
-      setSyncStatus('ok', 'Saved to cloud &#10003;');
+      setSyncStatus('ok', 'Saved to cloud;');
     } catch(e) {
       setSyncStatus('err', 'Save failed - check connection');
     }
