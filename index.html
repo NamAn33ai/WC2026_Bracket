@@ -22,11 +22,11 @@ const FB_BASE = `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/data
 // Convert JS object to Firestore REST format
 function toFS(val) {
 if (val === null || val === undefined) return { nullValue: null };
-if (typeof val === ‘boolean’) return { booleanValue: val };
-if (typeof val === ‘number’) return Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
-if (typeof val === ‘string’) return { stringValue: val };
+if (typeof val === 'boolean') return { booleanValue: val };
+if (typeof val === 'number') return Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
+if (typeof val === 'string') return { stringValue: val };
 if (Array.isArray(val)) return { arrayValue: { values: val.map(toFS) } };
-if (typeof val === ‘object’) {
+if (typeof val === 'object') {
 const fields = {};
 for (const k in val) fields[k] = toFS(val[k]);
 return { mapValue: { fields } };
@@ -37,13 +37,13 @@ return { stringValue: String(val) };
 // Convert Firestore REST format back to JS object
 function fromFS(fsVal) {
 if (!fsVal) return null;
-if (‘nullValue’ in fsVal) return null;
-if (‘booleanValue’ in fsVal) return fsVal.booleanValue;
-if (‘integerValue’ in fsVal) return parseInt(fsVal.integerValue);
-if (‘doubleValue’ in fsVal) return fsVal.doubleValue;
-if (‘stringValue’ in fsVal) return fsVal.stringValue;
-if (‘arrayValue’ in fsVal) return (fsVal.arrayValue.values || []).map(fromFS);
-if (‘mapValue’ in fsVal) {
+if ('nullValue' in fsVal) return null;
+if ('booleanValue' in fsVal) return fsVal.booleanValue;
+if ('integerValue' in fsVal) return parseInt(fsVal.integerValue);
+if ('doubleValue' in fsVal) return fsVal.doubleValue;
+if ('stringValue' in fsVal) return fsVal.stringValue;
+if ('arrayValue' in fsVal) return (fsVal.arrayValue.values || []).map(fromFS);
+if ('mapValue' in fsVal) {
 const obj = {};
 for (const k in (fsVal.mapValue.fields || {})) obj[k] = fromFS(fsVal.mapValue.fields[k]);
 return obj;
@@ -70,8 +70,8 @@ const controller = new AbortController();
 const timer = setTimeout(() => controller.abort(), 8000);
 try {
 const res = await fetch(url, {
-method: ‘GET’,
-headers: { ‘Content-Type’: ‘application/json’ },
+method: 'GET',
+headers: { 'Content-Type': 'application/json' },
 signal: controller.signal
 });
 clearTimeout(timer);
@@ -84,7 +84,7 @@ const data = await res.json();
 return docToObj(data);
 } catch(e) {
 clearTimeout(timer);
-if (e.name === ‘AbortError’) throw new Error(‘Request timed out’);
+if (e.name === 'AbortError') throw new Error('Request timed out');
 throw e;
 }
 }
@@ -95,8 +95,8 @@ const controller = new AbortController();
 const timer = setTimeout(() => controller.abort(), 8000);
 try {
 const res = await fetch(url, {
-method: ‘PATCH’,
-headers: { ‘Content-Type’: ‘application/json’ },
+method: 'PATCH',
+headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({ fields: objToFields(obj) }),
 signal: controller.signal
 });
@@ -108,7 +108,7 @@ throw new Error(`SET ${res.status}: ${txt.slice(0,100)}`);
 return true;
 } catch(e) {
 clearTimeout(timer);
-if (e.name === ‘AbortError’) throw new Error(‘Request timed out’);
+if (e.name === 'AbortError') throw new Error('Request timed out');
 throw e;
 }
 }
@@ -119,8 +119,8 @@ const controller = new AbortController();
 const timer = setTimeout(() => controller.abort(), 8000);
 try {
 const res = await fetch(url, {
-method: ‘GET’,
-headers: { ‘Content-Type’: ‘application/json’ },
+method: 'GET',
+headers: { 'Content-Type': 'application/json' },
 signal: controller.signal
 });
 clearTimeout(timer);
@@ -133,33 +133,33 @@ if (!data.documents) return [];
 return data.documents.map(d => docToObj(d)).filter(Boolean);
 } catch(e) {
 clearTimeout(timer);
-if (e.name === ‘AbortError’) throw new Error(‘List timed out’);
+if (e.name === 'AbortError') throw new Error('List timed out');
 throw e;
 }
 }
 
-window.*fb = {
+window._fb = {
 async fbSavePrediction(playerName, data) {
-const key = playerName.toLowerCase().replace(/\s+/g, ’*’);
-await fsSet(‘predictions’, key, { name: playerName, …data, updatedAt: Date.now() });
+const key = playerName.toLowerCase().replace(/\s+/g, '*');
+await fsSet('predictions', key, { name: playerName, ...data, updatedAt: Date.now() });
 },
 async fbLoadPrediction(playerName) {
-const key = playerName.toLowerCase().replace(/\s+/g, ‘_’);
-return await fsGet(‘predictions’, key);
+const key = playerName.toLowerCase().replace(/\s+/g, '_');
+return await fsGet('predictions', key);
 },
 async fbSaveResults(data) {
-await fsSet(‘shared’, ‘results’, { …data, updatedAt: Date.now() });
+await fsSet('shared', 'results', { ...data, updatedAt: Date.now() });
 },
 async fbLoadResults() {
-return await fsGet(‘shared’, ‘results’);
+return await fsGet('shared', 'results');
 },
 async fbLoadAllPredictions() {
-return await fsGetAll(‘predictions’);
+return await fsGetAll('predictions');
 }
 };
 
 window._fbReady = true;
-document.dispatchEvent(new Event(‘fbReady’));
+document.dispatchEvent(new Event('fbReady'));
 </script>
 
 <style>
