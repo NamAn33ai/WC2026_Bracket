@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:;">
-<!-- v20-featured-bracket -->
+<!-- v21-copy-group -->
 <title>FIFA World Cup 2026 - Knockout Bracket Challenge</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
 <script>
@@ -120,6 +120,9 @@ window._fb = {
   async fbLoadResults() { return await fsGet('ko_shared', GROUP_CODE + '__results'); },
   async fbSaveBracket(data) { await fsSet('ko_shared', GROUP_CODE + '__bracket', { group: GROUP_CODE, ...data, updatedAt: Date.now() }); },
   async fbLoadBracket() { return await fsGet('ko_shared', GROUP_CODE + '__bracket'); },
+  // Load another group's shared docs (for copying a bracket template between groups).
+  async fbLoadBracketOf(groupCode) { return await fsGet('ko_shared', groupCode + '__bracket'); },
+  async fbLoadResultsOf(groupCode) { return await fsGet('ko_shared', groupCode + '__results'); },
   async fbLoadAllPredictions() {
     const all = await fsGetAll('ko_predictions');
     // only this group's players (keyed/prefixed by group)
@@ -298,6 +301,15 @@ document.dispatchEvent(new Event('fbReady'));
     <div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:22px;">
       <div style="font-family:'Bebas Neue',sans-serif;font-size:1.05rem;letter-spacing:2px;color:var(--gold);margin-bottom:10px;">&#128302; Step 1 &middot; Set the 32 Teams (Round of 32)</div>
       <div style="font-size:0.8rem;color:var(--muted);margin-bottom:12px;">After the group stage ends, fetch the official R32 matchups from API-Football, or enter them manually below. Free key at <a href="https://dashboard.api-football.com/register" target="_blank" style="color:var(--gold);">dashboard.api-football.com/register</a></div>
+      <div style="background:var(--card);border:1px dashed var(--border);border-radius:8px;padding:10px 12px;margin-bottom:14px;">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:0.78rem;letter-spacing:1px;color:var(--gold);text-transform:uppercase;margin-bottom:6px;">&#128203; Reuse a Bracket from Another Group</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px;">Setting up a new group? Copy the 32 teams, deadline, and official results from an existing group so you don't re-enter them. Then just Publish.</div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center;">
+          <input type="text" id="copyFromInput" value="main" class="admin-input" style="min-width:140px;" placeholder="source group code"/>
+          <button class="btn btn-gold" onclick="copyFromGroup()">&#128203; Copy from Group</button>
+          <span id="copy-status" style="font-family:'Barlow Condensed',sans-serif;font-size:0.8rem;color:var(--muted);"></span>
+        </div>
+      </div>
       <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
         <input type="text" id="apiKeyInput" placeholder="Paste API-Football key..." oninput="saveApiKey()" class="admin-input" style="flex:1;min-width:200px;"/>
         <button class="btn btn-gold" onclick="fetchR32Bracket()" id="fetchBracketBtn">&#9889; Fetch R32 Matchups</button>
@@ -764,6 +776,42 @@ function fillSampleTeams() {
   const s = document.getElementById('fetch-bracket-status');
   s.style.color = 'var(--green)';
   s.textContent = 'Sample teams filled - click Publish to test';
+}
+
+// Copy the 32 teams, deadline, and official results from another group (default "main")
+// into THIS group's editor buffers. Admin then clicks Publish/Save to commit them here.
+async function copyFromGroup() {
+  const src = (document.getElementById('copyFromInput').value || 'main').trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
+  const s = document.getElementById('copy-status');
+  if (!src) { s.style.color='#f59e0b'; s.textContent='Enter a source group code'; return; }
+  if (src === GROUP_CODE) { s.style.color='#f59e0b'; s.textContent="That's the current group - pick a different source"; return; }
+  s.style.color='var(--muted)'; s.textContent='Loading from "'+src+'"...';
+  try {
+    const srcBracket = await window._fb.fbLoadBracketOf(src);
+    if (!srcBracket || !srcBracket.r32 || srcBracket.r32.length !== 32) {
+      s.style.color='#f87171'; s.textContent='No published bracket found in group "'+src+'"'; return;
+    }
+    // Teams + deadline -> editor buffers
+    if (!adminBracket) adminBracket = { r32: new Array(32).fill('') };
+    adminBracket.r32 = srcBracket.r32.slice();
+    pickDeadline = srcBracket.deadline || 0;
+    const dEl = document.getElementById('deadlineInput');
+    if (dEl) dEl.value = pickDeadline ? msToLocalInput(pickDeadline) : '';
+    renderAdminR32Editor();
+    // Official results -> admin results buffer (optional; may not exist yet)
+    let resultsMsg = '';
+    const srcResults = await window._fb.fbLoadResultsOf(src);
+    if (srcResults && srcResults.ko) {
+      adminResults = Object.assign(emptyKO(), JSON.parse(JSON.stringify(srcResults.ko)));
+      adminResults.r32 = adminBracket.r32.slice();
+      renderAdminResults();
+      resultsMsg = ' + results';
+    }
+    s.style.color='var(--green)';
+    s.textContent = 'Copied teams'+(pickDeadline?' + deadline':'')+resultsMsg+' from "'+src+'". Click Publish below'+(resultsMsg?', then Save Results':'')+' to apply to this group.';
+  } catch(e) {
+    s.style.color='#f87171'; s.textContent='Error: '+e.message;
+  }
 }
 
 // Randomly pick winners through every round of the RESULTS bracket (for testing scoring).
