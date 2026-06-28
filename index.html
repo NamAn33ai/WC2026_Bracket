@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:;">
-<!-- v19-pick-lock -->
+<!-- v20-featured-bracket -->
 <title>FIFA World Cup 2026 - Knockout Bracket Challenge</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
 <script>
@@ -248,6 +248,7 @@ document.dispatchEvent(new Event('fbReady'));
 <div class="tabs">
   <button class="tab active" onclick="showTab('bracket',this)">My Bracket</button>
   <button class="tab" onclick="showTab('leaderboard',this)">&#127942; Leaderboard</button>
+  <button class="tab" id="featured-tab-btn" style="display:none;" onclick="showTab('featured',this)">&#129351; Winner's Bracket</button>
   <button class="tab" id="admin-tab-btn" style="display:none;" onclick="showTab('admin',this)">&#128272; Admin</button>
 </div>
 
@@ -269,6 +270,14 @@ document.dispatchEvent(new Event('fbReady'));
       <strong>How to play:</strong> Enter your name and tap <strong>Join</strong>. Click a team in each matchup to pick the winner, advancing through to the Champion. Points are awarded for each correct pick, worth more in later rounds. Your picks auto-save to the cloud.
     </div>
     <div id="bracket-container"></div>
+  </div>
+
+  <!-- FEATURED WINNER'S BRACKET -->
+  <div id="tab-featured" class="tab-panel">
+    <div class="instructions">
+      &#129351; <strong>Winner's Bracket</strong> &mdash; the featured player's full set of picks, shown after the tournament finishes.
+    </div>
+    <div id="featured-container"></div>
   </div>
 
   <!-- LEADERBOARD -->
@@ -318,6 +327,17 @@ document.dispatchEvent(new Event('fbReady'));
       </div>
       <div id="admin-results-bracket"></div>
     </div>
+
+    <div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:22px;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.05rem;letter-spacing:2px;color:var(--gold);margin-bottom:10px;">&#129351; Step 3 &middot; Feature the Winner's Bracket</div>
+      <div style="font-size:0.8rem;color:var(--muted);margin-bottom:12px;">Pick whose bracket to share with the group. It becomes visible to everyone in a "Winner's Bracket" tab &mdash; but only after you've entered the Champion result above.</div>
+      <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center;">
+        <select id="featureSelect" class="admin-input" style="min-width:200px;"></select>
+        <button class="btn btn-gold" onclick="featureBracket()">&#129351; Feature This Bracket</button>
+        <button class="btn btn-outline" onclick="unfeatureBracket()">Clear</button>
+        <span id="feature-status" style="font-family:'Barlow Condensed',sans-serif;font-size:0.8rem;color:var(--muted);"></span>
+      </div>
+    </div>
   </div>
 </div>
 <script>
@@ -361,6 +381,7 @@ function teamFlag(teamName) {
 // ===================== STATE =====================
 let bracket = null;       // shared R32 seeding: { r32:[32 team names in 16 pairs], deadline:<ms timestamp or 0> }
 let pickDeadline = 0;     // ms timestamp; picks lock once now >= deadline (0 = no deadline set)
+let featuredPlayer = '';  // name of the player whose bracket the admin has featured (shown after champion entered)
 let results = { ko:{r32:[],r16:[],qf:[],sf:[],final:[],champion:"",third_place:[]} };
 let players = [];         // [{name}]
 let predictions = {};     // { playerName: predObj }
@@ -458,6 +479,15 @@ function showTab(tabId, btn) {
   if (tabId==='leaderboard') loadLeaderboard();
   if (tabId==='admin') renderAdmin();
   if (tabId==='bracket') renderBracket();
+  if (tabId==='featured') renderFeatured();
+}
+
+// Show the Winner's Bracket tab only when a player is featured AND the champion result is in.
+function updateFeaturedTabVisibility() {
+  const btn = document.getElementById('featured-tab-btn');
+  if (!btn) return;
+  const champEntered = !!(results.ko && results.ko.champion);
+  btn.style.display = (featuredPlayer && champEntered) ? '' : 'none';
 }
 
 // ===================== BRACKET RENDER (player picks) =====================
@@ -534,6 +564,74 @@ function renderBracket() {
   container.innerHTML = html;
 }
 
+// Build a READ-ONLY bracket tree for any prediction object (used for the featured winner's bracket).
+// No click handlers, no lock logic - purely a display of someone's completed picks.
+function buildReadOnlyBracket(pred, seedR32) {
+  if (!pred || !pred.ko) return '<div style="color:var(--muted);padding:16px;">No picks found.</div>';
+  const ko = pred.ko;
+  ko.r32 = (seedR32 && seedR32.length===32) ? seedR32.slice() : (ko.r32||[]);
+  function getWinner(rid, i) {
+    const nr = getNextRound(rid);
+    if (nr === 'champion') return ko.champion || '';
+    return (ko[nr]||[])[i] || '';
+  }
+  function card(rid, i, t1, t2) {
+    const w = getWinner(rid, i);
+    const w1 = w&&w===t1?'winner':(w&&w!==t1?'loser':'');
+    const w2 = w&&w===t2?'winner':(w&&w!==t2?'loser':'');
+    return '<div class="bk-match">'+
+      '<div class="bk-team '+w1+'">'+teamFlag(t1)+'<span class="bk-team-name">'+(t1||'?')+'</span>'+(w===t1&&t1?'<span class="bk-check">&#10003;</span>':'')+'</div>'+
+      '<div class="bk-team '+w2+'">'+teamFlag(t2)+'<span class="bk-team-name">'+(t2||'?')+'</span>'+(w===t2&&t2?'<span class="bk-check">&#10003;</span>':'')+'</div>'+
+      '</div>';
+  }
+  let html = '<div class="bracket-wrap"><div class="bracket-tree">';
+  ROUNDS.forEach(round => {
+    const teams = ko[round.id] || [];
+    html += '<div class="bracket-col round-'+round.id+'"><div class="bracket-col-label">'+round.label+'</div><div class="bracket-col-matches">';
+    for (let i=0;i<round.n;i++){
+      const t1=teams[i*2]||'?', t2=teams[i*2+1]||'?';
+      html += '<div class="bracket-slot">'+card(round.id,i,t1,t2)+'</div>';
+    }
+    html += '</div></div>';
+  });
+  const champ = ko.champion||'';
+  html += '<div class="bracket-col round-champ"><div class="bracket-col-label">Champion</div><div class="bracket-col-matches"><div class="bracket-slot"><div class="champion-box" style="width:100%;"><div class="champion-trophy">&#127942;</div><div class="champion-label">World Champion</div><div class="champion-name">'+(champ?teamFlag(champ)+' '+champ:'TBD')+'</div></div></div></div></div>';
+  html += '</div>';
+  const sfT = ko.sf||[], sfW = ko.final||[];
+  const l0 = sfW[0] ? (sfW[0]===sfT[0]?sfT[1]:sfT[0]) : '?';
+  const l1 = sfW[1] ? (sfW[1]===sfT[2]?sfT[3]:sfT[2]) : '?';
+  const tpw = (ko.third_place||[])[0] || '';
+  html += '<div class="third-place-section"><div style="text-align:center;margin-bottom:10px;"><span class="third-place-label">&#129352; 3rd Place Match</span></div><div class="third-place-match">'+
+    '<div class="bk-team '+(tpw===l0&&l0?'winner':(tpw&&tpw!==l0?'loser':''))+'">'+teamFlag(l0)+'<span class="bk-team-name">'+(l0||'?')+'</span>'+(tpw===l0&&l0?'<span class="bk-check">&#10003;</span>':'')+'</div>'+
+    '<div class="bk-team '+(tpw===l1&&l1?'winner':(tpw&&tpw!==l1?'loser':''))+'">'+teamFlag(l1)+'<span class="bk-team-name">'+(l1||'?')+'</span>'+(tpw===l1&&l1?'<span class="bk-check">&#10003;</span>':'')+'</div>'+
+    '</div></div>';
+  return html;
+}
+
+// Render the featured winner's bracket tab. Only visible once a champion result exists AND admin featured someone.
+async function renderFeatured() {
+  const container = document.getElementById('featured-container');
+  if (!container) return;
+  const champEntered = !!(results.ko && results.ko.champion);
+  if (!featuredPlayer || !champEntered) {
+    container.innerHTML = '<div style="color:var(--muted);font-family:\'Barlow Condensed\',sans-serif;padding:20px;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:10px;">The winner\'s bracket will appear here once the tournament finishes and the admin features it.</div>';
+    return;
+  }
+  container.innerHTML = '<div style="color:var(--muted);padding:16px;">Loading '+featuredPlayer+'\'s bracket...</div>';
+  try {
+    const saved = await window._fb.fbLoadPrediction(featuredPlayer);
+    if (!saved || !saved.ko) { container.innerHTML = '<div style="color:#f87171;padding:16px;">Could not load that bracket.</div>'; return; }
+    const score = calcScore({ko:saved.ko});
+    let html = '<div style="background:rgba(245,197,24,0.1);border:1px solid var(--gold);border-radius:8px;padding:13px 16px;margin-bottom:16px;font-family:\'Barlow Condensed\',sans-serif;">'+
+      '<span style="font-size:1.1rem;color:var(--gold);font-weight:700;letter-spacing:1px;">&#127942; '+featuredPlayer+'</span>'+
+      '<span style="color:var(--muted);font-size:0.85rem;margin-left:10px;">'+score.total+' points</span></div>';
+    html += buildReadOnlyBracket({ko:saved.ko}, bracket && bracket.r32);
+    container.innerHTML = html;
+  } catch(e) {
+    container.innerHTML = '<div style="color:#f87171;padding:16px;">Error: '+e.message+'</div>';
+  }
+}
+
 // When a winner is picked, set it in the next round and clear any now-invalid downstream picks
 function pickWinner(rid, matchIdx, teamName) {
   if (isLocked()) { setSyncStatus('err','Picks are locked - R32 has started'); return; }
@@ -601,6 +699,8 @@ async function loadLeaderboard() {
   try {
     const resData = await window._fb.fbLoadResults();
     if (resData && resData.ko) results.ko = Object.assign(emptyKO(), resData.ko);
+    if (resData && typeof resData.featured === 'string') featuredPlayer = resData.featured;
+    updateFeaturedTabVisibility();
     const all = await window._fb.fbLoadAllPredictions();
     if (!all.length) { cont.innerHTML = '<p style="color:var(--muted);font-family:\'Barlow Condensed\',sans-serif;">No players yet.</p>'; return; }
     const scored = all.map(p => ({name:p.name, score:calcScore({ko:p.ko})}));
@@ -634,6 +734,7 @@ function renderAdmin() {
   if (dEl) dEl.value = pickDeadline ? msToLocalInput(pickDeadline) : '';
   renderAdminR32Editor();
   renderAdminResults();
+  loadFeatureOptions();
 }
 
 // Convert a ms timestamp to the value format datetime-local expects (local time, no TZ suffix).
@@ -807,12 +908,55 @@ function setResultThird(teamName){ if(!teamName||teamName==='?')return; adminRes
 
 async function publishResults() {
   try {
-    await window._fb.fbSaveResults({ ko: adminResults });
+    await window._fb.fbSaveResults({ ko: adminResults, featured: featuredPlayer || '' });
     results.ko = Object.assign(emptyKO(), JSON.parse(JSON.stringify(adminResults)));
+    updateFeaturedTabVisibility();
     const s=document.getElementById('save-results-status'); s.style.color='var(--green)'; s.textContent='Saved! Scores updated.';
   } catch(e) {
     const s=document.getElementById('save-results-status'); s.style.color='#f87171'; s.textContent='Error: '+e.message;
   }
+}
+
+// Populate the feature dropdown with all players in this group (by score, highest first).
+async function loadFeatureOptions() {
+  const sel = document.getElementById('featureSelect');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Loading players...</option>';
+  try {
+    const all = await window._fb.fbLoadAllPredictions();
+    if (!all.length) { sel.innerHTML = '<option value="">No players yet</option>'; return; }
+    const scored = all.map(p => ({name:p.name, score:calcScore({ko:p.ko}).total}));
+    scored.sort((a,b)=>b.score-a.score);
+    sel.innerHTML = '<option value="">-- choose a player --</option>' +
+      scored.map(p => '<option value="'+p.name.replace(/"/g,'&quot;')+'"'+(p.name===featuredPlayer?' selected':'')+'>'+p.name+' ('+p.score+' pts)</option>').join('');
+  } catch(e) {
+    sel.innerHTML = '<option value="">Error loading players</option>';
+  }
+}
+
+async function featureBracket() {
+  const sel = document.getElementById('featureSelect');
+  const name = sel ? sel.value : '';
+  const s = document.getElementById('feature-status');
+  if (!name) { s.style.color='#f59e0b'; s.textContent='Pick a player first'; return; }
+  if (!results.ko || !results.ko.champion) { s.style.color='#f59e0b'; s.textContent='Enter the Champion result first (Step 2) - the bracket stays hidden until then'; }
+  try {
+    featuredPlayer = name;
+    await window._fb.fbSaveResults({ ko: adminResults || results.ko, featured: name });
+    updateFeaturedTabVisibility();
+    s.style.color='var(--green)'; s.textContent = 'Featured ' + name + (results.ko && results.ko.champion ? ' - now visible to everyone' : ' - will show once Champion is entered');
+  } catch(e) { s.style.color='#f87171'; s.textContent='Error: '+e.message; }
+}
+
+async function unfeatureBracket() {
+  const s = document.getElementById('feature-status');
+  try {
+    featuredPlayer = '';
+    await window._fb.fbSaveResults({ ko: adminResults || results.ko, featured: '' });
+    updateFeaturedTabVisibility();
+    const sel = document.getElementById('featureSelect'); if (sel) sel.value='';
+    s.style.color='var(--muted)'; s.textContent='Cleared - no bracket featured';
+  } catch(e) { s.style.color='#f87171'; s.textContent='Error: '+e.message; }
 }
 
 // ===================== API-FOOTBALL FETCH =====================
@@ -915,6 +1059,7 @@ async function boot() {
     diag.textContent = 'Loading results...';
     const rData = await window._fb.fbLoadResults();
     if (rData && rData.ko) results.ko = Object.assign(emptyKO(), rData.ko);
+    if (rData && typeof rData.featured === 'string') featuredPlayer = rData.featured;
     // returning player?
     const savedName = localStorage.getItem('wc_ko_myname_'+GROUP_CODE);
     if (savedName) {
@@ -936,6 +1081,7 @@ async function boot() {
   loadApiKey();
   renderPlayerTabs();
   renderBracket();
+  updateFeaturedTabVisibility();
 
   // Live lock: if a deadline is set and the page stays open, re-render once it passes
   // so the bracket locks without needing a manual refresh.
