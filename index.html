@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:;">
-<!-- v22-global-results -->
+<!-- v23-autopick -->
 <title>FIFA World Cup 2026 - Knockout Bracket Challenge</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
 <script>
@@ -544,6 +544,14 @@ function renderBracket() {
     html += '<div style="background:rgba(245,197,24,0.1);border:1px solid var(--gold);border-radius:8px;padding:11px 14px;margin-bottom:16px;font-family:\'Barlow Condensed\',sans-serif;font-size:0.9rem;color:var(--gold);letter-spacing:0.5px;">&#9201; Picks lock at the first R32 kickoff: <strong>'+deadlineText()+'</strong>. Make sure your bracket is complete before then.</div>';
   }
 
+  // Auto-pick button (fills only empty slots). Hidden once locked.
+  if (!locked) {
+    html += '<div style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'+
+      '<button class="btn btn-outline" onclick="autoPickRemaining()">&#127922; Auto-Pick Remaining</button>'+
+      '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:0.78rem;color:var(--muted);">Randomly fills any matchups you haven\'t picked yet &mdash; your existing picks stay.</span>'+
+      '</div>';
+  }
+
   html += '<div class="bracket-wrap"><div class="bracket-tree">';
   ROUNDS.forEach(round => {
     const teams = pred.ko[round.id] || [];
@@ -679,6 +687,49 @@ function pickThird(teamName) {
   pred.ko.third_place = [teamName];
   scheduleSave();
   renderBracket();
+}
+
+// Auto-pick: randomly fill ONLY the empty slots through every round, keeping existing picks.
+// Processes rounds in order so winners cascade forward correctly.
+function autoPickRemaining() {
+  if (isLocked()) { setSyncStatus('err','Picks are locked - R32 has started'); return; }
+  const pred = predictions[currentPlayer];
+  if (!pred) return;
+  if (!bracket || !bracket.r32 || bracket.r32.length!==32) return;
+  pred.ko.r32 = bracket.r32.slice();
+  if (!pred.ko.third_place) pred.ko.third_place = [];
+
+  let filled = 0;
+  // Walk R32 -> Final. For each match, if both teams are known but no winner chosen, pick randomly.
+  ROUNDS.forEach(round => {
+    const teams = pred.ko[round.id] || [];
+    const nr = getNextRound(round.id);
+    for (let i=0;i<round.n;i++) {
+      const t1 = teams[i*2], t2 = teams[i*2+1];
+      if (!t1 || !t2 || t1==='?' || t2==='?') continue; // can't pick until both feeders are set
+      // current winner for this match
+      let cur;
+      if (nr === 'champion') cur = pred.ko.champion || '';
+      else cur = (pred.ko[nr]||[])[i] || '';
+      if (cur) continue; // already picked - keep it
+      const winner = Math.random()<0.5 ? t1 : t2;
+      if (nr === 'champion') pred.ko.champion = winner;
+      else { if(!pred.ko[nr]) pred.ko[nr]=[]; pred.ko[nr][i] = winner; }
+      filled++;
+    }
+  });
+  // 3rd place: fill if empty and both SF losers known
+  const sfTeams = pred.ko.sf||[], sfWinners = pred.ko.final||[];
+  const l0 = sfWinners[0] ? (sfWinners[0]===sfTeams[0]?sfTeams[1]:sfTeams[0]) : '';
+  const l1 = sfWinners[1] ? (sfWinners[1]===sfTeams[2]?sfTeams[3]:sfTeams[2]) : '';
+  if (l0 && l1 && !(pred.ko.third_place||[])[0]) {
+    pred.ko.third_place = [Math.random()<0.5 ? l0 : l1];
+    filled++;
+  }
+
+  scheduleSave();
+  renderBracket();
+  setSyncStatus('ok', filled>0 ? ('Auto-filled '+filled+' empty pick'+(filled===1?'':'s')) : 'Bracket already complete');
 }
 
 // ===================== SCORING =====================
