@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:;">
-<!-- v23-autopick -->
+<!-- v24-prune-stale -->
 <title>FIFA World Cup 2026 - Knockout Bracket Challenge</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
 <script>
@@ -363,6 +363,37 @@ const ROUNDS = [
 ];
 function getNextRound(r){ return {r32:'r16',r16:'qf',qf:'sf',sf:'final',final:'champion'}[r]; }
 
+// Remove any downstream winner that isn't actually present in its feeder match.
+// Fixes stale data when the R32 seeding changes (e.g. new bracket) but old R16+ winners linger.
+// `ko` must already have ko.r32 set to the current 32 teams. Mutates ko in place.
+function pruneInvalidPicks(ko) {
+  if (!ko) return;
+  const sizes = {r32:16,r16:8,qf:4,sf:2,final:1};
+  ['r32','r16','qf','sf','final'].forEach(rid => {
+    const teams = ko[rid] || [];
+    const nr = getNextRound(rid);
+    const n = sizes[rid];
+    for (let i=0;i<n;i++){
+      const t1 = teams[i*2], t2 = teams[i*2+1];
+      const valid = [t1,t2].filter(x => x && x!=='?');
+      if (nr === 'champion') {
+        if (ko.champion && !valid.includes(ko.champion)) ko.champion = '';
+      } else {
+        if (!ko[nr]) ko[nr] = [];
+        const w = ko[nr][i];
+        // a winner is only valid if it's one of this match's two (now-current) teams
+        if (w && !valid.includes(w)) ko[nr][i] = '';
+      }
+    }
+  });
+  // 3rd place must be one of the two SF losers
+  const sfT = ko.sf||[], sfW = ko.final||[];
+  const l0 = sfW[0] ? (sfW[0]===sfT[0]?sfT[1]:sfT[0]) : '';
+  const l1 = sfW[1] ? (sfW[1]===sfT[2]?sfT[3]:sfT[2]) : '';
+  const tp = (ko.third_place||[])[0];
+  if (tp && tp!==l0 && tp!==l1) ko.third_place = [];
+}
+
 // Flag rendering via flagcdn images (works on all platforms). Maps team name -> ISO code.
 // Covers all 48 WC2026 teams so admin-entered names resolve to flags.
 const FLAG_MAP = {
@@ -518,6 +549,8 @@ function renderBracket() {
   if (!pred.ko.third_place) pred.ko.third_place = [];
 
   const locked = isLocked();
+  // Before lock, clear any picks orphaned by a bracket change so the player can re-pick cleanly.
+  if (!locked) pruneInvalidPicks(pred.ko);
 
   function getWinner(rid, i) {
     const nr = getNextRound(rid);
@@ -698,6 +731,7 @@ function autoPickRemaining() {
   if (!bracket || !bracket.r32 || bracket.r32.length!==32) return;
   pred.ko.r32 = bracket.r32.slice();
   if (!pred.ko.third_place) pred.ko.third_place = [];
+  pruneInvalidPicks(pred.ko); // drop stale winners so they get re-filled, not kept
 
   let filled = 0;
   // Walk R32 -> Final. For each match, if both teams are known but no winner chosen, pick randomly.
@@ -922,6 +956,7 @@ function renderAdminResults() {
   if (!adminResults) adminResults = Object.assign(emptyKO(), JSON.parse(JSON.stringify(results.ko||{})));
   adminResults.r32 = bracket.r32.slice();
   if (!adminResults.third_place) adminResults.third_place = [];
+  pruneInvalidPicks(adminResults); // clear any winners left over from a previous bracket
 
   function getWinner(rid,i){ const nr=getNextRound(rid); if(nr==='champion')return adminResults.champion||''; return (adminResults[nr]||[])[i]||''; }
   function card(rid,i,t1,t2){
